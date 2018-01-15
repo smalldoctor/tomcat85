@@ -655,7 +655,7 @@ public class FormAuthenticator
         int maxSavePostSize = request.getConnector().getMaxSavePostSize();
         if (maxSavePostSize != 0) {
             ByteChunk body = new ByteChunk();
-            body.setLimit(maxSavePostSize);
+            body.setLimit(request.getConnector().getMaxSavePostSize());
 
             byte[] buffer = new byte[4096];
             int bytesRead;

@@ -175,6 +175,9 @@ public abstract class AbstractHttp11Protocol<S> extends AbstractProtocol<S> {
     }
 
 
+    /**
+     * Integrated compression support.
+     */
     public String getCompression() {
         return compressionConfig.getCompression();
     }
