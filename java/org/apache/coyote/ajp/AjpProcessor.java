@@ -38,7 +38,6 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.buf.ByteChunk;
-import org.apache.tomcat.util.buf.HexUtils;
 import org.apache.tomcat.util.buf.MessageBytes;
 import org.apache.tomcat.util.http.HttpMessages;
 import org.apache.tomcat.util.http.MimeHeaders;
@@ -171,12 +170,6 @@ public class AjpProcessor extends AbstractProcessor {
      * Body message.
      */
     private final MessageBytes bodyBytes = MessageBytes.newInstance();
-
-
-    /**
-     * Host name (used to avoid useless B2C conversion on the host name).
-     */
-    private char[] hostNameC = new char[0];
 
 
     /**
@@ -640,10 +633,10 @@ public class AjpProcessor extends AbstractProcessor {
             if (messageLength > message.getBuffer().length) {
                 // Message too long for the buffer
                 // Need to trigger a 400 response
-                throw new IllegalArgumentException(sm.getString(
-                        "ajpprocessor.header.tooLong",
-                        Integer.valueOf(messageLength),
-                        Integer.valueOf(buf.length)));
+                String msg = sm.getString("ajpprocessor.header.tooLong",
+                        Integer.valueOf(messageLength), Integer.valueOf(buf.length));
+                log.error(msg);
+                throw new IllegalArgumentException(msg);
             }
             read(buf, Constants.H_SIZE, messageLength, true);
             return true;
@@ -947,67 +940,20 @@ public class AjpProcessor extends AbstractProcessor {
 
 
     /**
-     * Parse host.
+     * {@inheritDoc}
+     * <p>
+     * This implementation populates the server name and port from the local
+     * name and port provided by the AJP message.
      */
-    private void parseHost(MessageBytes valueMB) {
-
-        if (valueMB == null || valueMB.isNull()) {
-            // HTTP/1.0
-            request.setServerPort(request.getLocalPort());
-            try {
-                request.serverName().duplicate(request.localName());
-            } catch (IOException e) {
-                response.setStatus(400);
-                setErrorState(ErrorState.CLOSE_CLEAN, e);
-            }
-            return;
-        }
-
-        ByteChunk valueBC = valueMB.getByteChunk();
-        byte[] valueB = valueBC.getBytes();
-        int valueL = valueBC.getLength();
-        int valueS = valueBC.getStart();
-        int colonPos = -1;
-        if (hostNameC.length < valueL) {
-            hostNameC = new char[valueL];
-        }
-
-        boolean ipv6 = (valueB[valueS] == '[');
-        boolean bracketClosed = false;
-        for (int i = 0; i < valueL; i++) {
-            char b = (char) valueB[i + valueS];
-            hostNameC[i] = b;
-            if (b == ']') {
-                bracketClosed = true;
-            } else if (b == ':') {
-                if (!ipv6 || bracketClosed) {
-                    colonPos = i;
-                    break;
-                }
-            }
-        }
-
-        if (colonPos < 0) {
-            request.serverName().setChars(hostNameC, 0, valueL);
-        } else {
-
-            request.serverName().setChars(hostNameC, 0, colonPos);
-
-            int port = 0;
-            int mult = 1;
-            for (int i = valueL - 1; i > colonPos; i--) {
-                int charValue = HexUtils.getDec(valueB[i + valueS]);
-                if (charValue == -1) {
-                    // Invalid character
-                    // 400 - Bad request
-                    response.setStatus(400);
-                    setErrorState(ErrorState.CLOSE_CLEAN, null);
-                    break;
-                }
-                port = port + (charValue * mult);
-                mult = 10 * mult;
-            }
-            request.setServerPort(port);
+    @Override
+    protected void populateHost() {
+        // No host information (HTTP/1.0)
+        request.setServerPort(request.getLocalPort());
+        try {
+            request.serverName().duplicate(request.localName());
+        } catch (IOException e) {
+            response.setStatus(400);
+            setErrorState(ErrorState.CLOSE_CLEAN, e);
         }
     }
 

@@ -829,8 +829,7 @@ public class HostConfig implements LifecycleListener {
         File xml = new File(host.getAppBaseFile(),
                 cn.getBaseName() + "/" + Constants.ApplicationContextXml);
 
-        File warTracker = new File(host.getAppBaseFile(),
-                cn.getBaseName() + "/" + Constants.WarTracker);
+        File warTracker = new File(host.getAppBaseFile(), cn.getBaseName() + Constants.WarTracker);
 
         boolean xmlInWar = false;
         try (JarFile jar = new JarFile(war)) {
@@ -1656,13 +1655,14 @@ public class HostConfig implements LifecycleListener {
      * now unused (have no active sessions) and undeploy any that are found.
      */
     public synchronized void checkUndeploy() {
+        if (deployed.size() < 2) {
+            return;
+        }
+
         // Need ordered set of names
         SortedSet<String> sortedAppNames = new TreeSet<>();
         sortedAppNames.addAll(deployed.keySet());
 
-        if (sortedAppNames.size() < 2) {
-            return;
-        }
         Iterator<String> iter = sortedAppNames.iterator();
 
         ContextName previous = new ContextName(iter.next(), false);

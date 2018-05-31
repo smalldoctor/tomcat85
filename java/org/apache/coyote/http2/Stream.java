@@ -37,6 +37,7 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.buf.ByteChunk;
 import org.apache.tomcat.util.http.MimeHeaders;
+import org.apache.tomcat.util.http.parser.Host;
 import org.apache.tomcat.util.net.ApplicationBufferHandler;
 import org.apache.tomcat.util.res.StringManager;
 
@@ -328,7 +329,14 @@ public class Stream extends AbstractStream implements HeaderEmitter {
         }
         case ":authority": {
             if (coyoteRequest.serverName().isNull()) {
-                int i = value.lastIndexOf(':');
+                int i;
+                try {
+                    i = Host.parse(value);
+                } catch (IllegalArgumentException iae) {
+                    // Host value invalid
+                    throw new HpackException(sm.getString("stream.header.invalid",
+                            getConnectionId(), getIdentifier(), ":authority", value));
+                }
                 if (i > -1) {
                     coyoteRequest.serverName().setString(value.substring(0, i));
                     coyoteRequest.setServerPort(Integer.parseInt(value.substring(i + 1)));
@@ -407,8 +415,7 @@ public class Stream extends AbstractStream implements HeaderEmitter {
 
     void writeHeaders() throws IOException {
         boolean endOfStream = streamOutputBuffer.hasNoBody();
-        // TODO: Is 1k the optimal value?
-        handler.writeHeaders(this, 0, coyoteResponse.getMimeHeaders(), endOfStream, 1024);
+        handler.writeHeaders(this, 0, coyoteResponse.getMimeHeaders(), endOfStream, Constants.DEFAULT_HEADERS_FRAME_SIZE);
     }
 
 
@@ -418,8 +425,7 @@ public class Stream extends AbstractStream implements HeaderEmitter {
 
 
     void writeAck() throws IOException {
-        // TODO: Is 64 too big? Just the status header with compression
-        handler.writeHeaders(this, 0, ACK_HEADERS, false, 64);
+        handler.writeHeaders(this, 0, ACK_HEADERS, false, Constants.DEFAULT_HEADERS_ACK_FRAME_SIZE);
     }
 
 
@@ -581,7 +587,8 @@ public class Stream extends AbstractStream implements HeaderEmitter {
 
 
     final void push(Request request) throws IOException {
-        if (!isPushSupported()) {
+        // Can only push when supported and from a peer initiated stream
+        if (!isPushSupported() || getIdentifier().intValue() % 2 == 0) {
             return;
         }
         // Set the special HTTP/2 headers

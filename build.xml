@@ -50,6 +50,8 @@
   <property name="websocket.revision" value="FR" />
   <!-- MR B but this was first 1.1 release so use FR -->
   <property name="jaspic.revision" value="FR" />
+  <!-- MR 2 but this was first 1.2 release so use FR -->
+  <property name="annotation.revision" value="FR" />
 
   <!-- Release artifact base names -->
   <property name="final.name"            value="${project}-${version}" />
@@ -687,8 +689,6 @@
 
   </target>
 
-
-
   <target name="build-manifests" unless="manifests.uptodate"
           depends="build-prepare">
     <!-- Filtering tokens for JAR manifests-->
@@ -699,6 +699,7 @@
     <filter token="el.revision" value="${el.revision}"/>
     <filter token="websocket.revision" value="${websocket.revision}"/>
     <filter token="jaspic.revision" value="${jaspic.revision}"/>
+    <filter token="annotation.revision" value="${annotation.revision}"/>
 
     <mkdir dir="${tomcat.manifests}" />
     <copy todir="${tomcat.manifests}" overwrite="yes" filtering="yes"
@@ -710,7 +711,7 @@
   </target>
 
   <target name="package" depends="compile,build-manifests" >
-    <!-- Common Annotations 1.0 JAR File -->
+    <!-- Common Annotations 1.2 JAR File -->
     <jarIt jarfile="${annotations-api.jar}"
       filesDir="${tomcat.classes}"
       filesId="files.annotations-api"
@@ -1291,7 +1292,6 @@
       <fileset dir="${tomcat.embed}">
         <include name="**" />
         <exclude name="*.asc" />
-        <exclude name="*.md5" />
         <exclude name="*.sha1" />
         <exclude name="*.sha512" />
         <exclude name="*.zip" />
@@ -1309,7 +1309,6 @@
       <tarfileset dir="${tomcat.embed}" prefix="${final.name}-embed">
         <include name="**" />
         <exclude name="*.asc" />
-        <exclude name="*.md5" />
         <exclude name="*.sha1" />
         <exclude name="*.sha512" />
         <exclude name="*.zip" />
@@ -2129,7 +2128,6 @@ skip.installer property in build.properties" />
     </signcode>
     <!-- .exe has changed so need to redo checksums and OpenPGP signature -->
     <delete file="${tomcat.release}/v${version}/bin/${final.name}.exe.asc" />
-    <delete file="${tomcat.release}/v${version}/bin/${final.name}.exe.md5" />
     <delete file="${tomcat.release}/v${version}/bin/${final.name}.exe.sha1" />
     <delete file="${tomcat.release}/v${version}/bin/${final.name}.exe.sha512" />
     <hashAndSign file="${tomcat.release}/v${version}/bin/${final.name}.exe" />
@@ -2170,7 +2168,6 @@ skip.installer property in build.properties" />
         <include name="*.zip"/>
         <include name="*.tar.gz"/>
         <include name="*.asc"/>
-        <include name="*.md5"/>
         <include name="*.sha1"/>
         <include name="*.sha512"/>
       </fileset>
@@ -2458,7 +2455,7 @@ skip.installer property in build.properties" />
 
     <mkdir dir="${tomcat.src.jars}" />
 
-    <!-- Common Annotations 1.0 JAR File -->
+    <!-- Common Annotations 1.2 JAR File -->
     <jarIt jarfile="${annotations-api-src.jar}"
       filesDir="java"
       filesId="files.annotations-api"
@@ -2952,16 +2949,13 @@ Read the Building page on the Apache Tomcat documentation site for details on ho
     <attribute name="file" />
     <sequential>
       <local name="filename" />
-      <local name="md5value" />
       <local name="sha1value" />
       <local name="sha512value" />
 
       <basename file="@{file}" property="filename" />
-      <checksum algorithm="MD5" file="@{file}" property="md5value" />
       <checksum algorithm="SHA-1" file="@{file}" property="sha1value" />
       <checksum algorithm="SHA-512" file="@{file}" property="sha512value" />
 
-      <echo file="@{file}.md5" message="${md5value}${md5sum.binary-prefix}${filename}" />
       <echo file="@{file}.sha1" message="${sha1value}${md5sum.binary-prefix}${filename}" />
       <echo file="@{file}.sha512" message="${sha512value}${md5sum.binary-prefix}${filename}" />
 

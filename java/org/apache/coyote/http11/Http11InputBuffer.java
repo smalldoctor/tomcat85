@@ -133,6 +133,7 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
     private int parsingRequestLineQPos = -1;
     private HeaderParsePosition headerParsePos;
     private final HeaderParseData headerData = new HeaderParseData();
+    private final HttpParser httpParser;
 
     /**
      * Maximum allowed size of the HTTP request line plus headers plus any
@@ -149,13 +150,14 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
     // ----------------------------------------------------------- Constructors
 
     public Http11InputBuffer(Request request, int headerBufferSize,
-            boolean rejectIllegalHeaderName) {
+            boolean rejectIllegalHeaderName, HttpParser httpParser) {
 
         this.request = request;
         headers = request.getMimeHeaders();
 
         this.headerBufferSize = headerBufferSize;
         this.rejectIllegalHeaderName = rejectIllegalHeaderName;
+        this.httpParser = httpParser;
 
         filterLibrary = new InputFilter[0];
         activeFilters = new InputFilter[0];
@@ -472,7 +474,13 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
                     end = pos;
                 } else if (chr == Constants.QUESTION && parsingRequestLineQPos == -1) {
                     parsingRequestLineQPos = pos;
-                } else if (HttpParser.isNotRequestTarget(chr)) {
+                } else if (parsingRequestLineQPos != -1 && !httpParser.isQueryRelaxed(chr)) {
+                    // %nn decoding will be checked at the point of decoding
+                    throw new IllegalArgumentException(sm.getString("iib.invalidRequestTarget"));
+                } else if (httpParser.isNotRequestTargetRelaxed(chr)) {
+                    // This is a general check that aims to catch problems early
+                    // Detailed checking of each part of the request target will
+                    // happen in Http11Processor#prepareRequest()
                     throw new IllegalArgumentException(sm.getString("iib.invalidRequestTarget"));
                 }
             }
@@ -703,6 +711,10 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
 
         if (parsingHeader) {
             if (byteBuffer.limit() >= headerBufferSize) {
+                if (parsingRequestLine) {
+                    // Avoid unknown protocol triggering an additional error
+                    request.protocol().setString(Constants.HTTP_11);
+                }
                 throw new IllegalArgumentException(sm.getString("iib.requestheadertoolarge.error"));
             }
         } else {
@@ -950,12 +962,12 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
 
     // ----------------------------------------------------------- Inner classes
 
-    private static enum HeaderParseStatus {
+    private enum HeaderParseStatus {
         DONE, HAVE_MORE_HEADERS, NEED_MORE_DATA
     }
 
 
-    private static enum HeaderParsePosition {
+    private enum HeaderParsePosition {
         /**
          * Start of a new header. A CRLF here means that there are no more
          * headers. Any other character starts a header name.

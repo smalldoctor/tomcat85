@@ -1552,6 +1552,9 @@ public class Request implements org.apache.catalina.servlet4preview.http.HttpSer
     private void notifyAttributeAssigned(String name, Object value,
             Object oldValue) {
         Context context = getContext();
+        if (context == null) {
+            return;
+        }
         Object listeners[] = context.getApplicationEventListeners();
         if ((listeners == null) || (listeners.length == 0)) {
             return;
@@ -1940,7 +1943,7 @@ public class Request implements org.apache.catalina.servlet4preview.http.HttpSer
      * @param principal The user Principal
      */
     public void setUserPrincipal(final Principal principal) {
-        if (Globals.IS_SECURITY_ENABLED) {
+        if (Globals.IS_SECURITY_ENABLED && principal != null) {
             if (subject == null) {
                 final HttpSession session = getSession(false);
                 if (session == null) {
@@ -2048,15 +2051,28 @@ public class Request implements org.apache.catalina.servlet4preview.http.HttpSer
      */
     @Override
     public String getContextPath() {
-        String canonicalContextPath = getServletContext().getContextPath();
-        String uri = getRequestURI();
-        char[] uriChars = uri.toCharArray();
         int lastSlash = mappingData.contextSlashCount;
         // Special case handling for the root context
         if (lastSlash == 0) {
             return "";
         }
+
+        String canonicalContextPath = getServletContext().getContextPath();
+
+        String uri = getRequestURI();
         int pos = 0;
+        if (!getContext().getAllowMultipleLeadingForwardSlashInPath()) {
+            // Ensure that the returned value only starts with a single '/'.
+            // This prevents the value being misinterpreted as a protocol-
+            // relative URI if used with sendRedirect().
+            do {
+                pos++;
+            } while (pos < uri.length() && uri.charAt(pos) == '/');
+            pos--;
+            uri = uri.substring(pos);
+        }
+
+        char[] uriChars = uri.toCharArray();
         // Need at least the number of slashes in the context path
         while (lastSlash > 0) {
             pos = nextSlash(uriChars, pos + 1);
